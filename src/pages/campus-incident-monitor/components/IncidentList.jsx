@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import { ApiService } from '../../../services/apiService';
 
-const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusUpdate, onAssignIncident, onAddComment }) => {
+const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusUpdate, onAssignIncident, onAddComment, volunteerView = false  }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [sortBy, setSortBy] = useState('reported_at');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -14,6 +14,43 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
   const [assignedUser, setAssignedUser] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Estado para voluntarios (solo admin)
+  const [selectedVolunteerIncident, setSelectedVolunteerIncident] = useState(null);
+  const [volunteerAssignments, setVolunteerAssignments] = useState([]);
+  const [loadingVolunteers, setLoadingVolunteers] = useState(false);
+
+   // NUEVO: Estado para lista de voluntarios disponibles
+  const [volunteersList, setVolunteersList] = useState([]);
+  const [loadingVolunteersList, setLoadingVolunteersList] = useState(false);
+
+  // Cargar lista de voluntarios cuando se abre el modal de asignación
+  useEffect(() => {
+    if (assigningIncident) {
+      loadVolunteersList();
+    }
+  }, [assigningIncident]);
+
+   // Función para cargar la lista de voluntarios desde la base de datos
+  const loadVolunteersList = async () => {
+    setLoadingVolunteersList(true);
+    try {
+      // Necesitarás crear esta función en tu ApiService
+      const result = await ApiService.getAllVolunteers();
+      if (result.success) {
+        setVolunteersList(result.data);
+        console.log(`✅ ${result.data.length} voluntarios cargados`);
+      } else {
+        console.error('Error cargando voluntarios:', result.error);
+        setVolunteersList([]);
+      }
+    } catch (error) {
+      console.error('Error cargando lista de voluntarios:', error);
+      setVolunteersList([]);
+    } finally {
+      setLoadingVolunteersList(false);
+    }
+  };
 
   // Sort incidents
   const sortedIncidents = [...incidents]?.sort((a, b) => {
@@ -31,6 +68,28 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
     return aValue < bValue ? 1 : -1;
   });
 
+  // Cargar asignaciones de voluntarios cuando se selecciona un incidente
+  useEffect(() => {
+    if (selectedVolunteerIncident && !volunteerView) {
+      loadVolunteerAssignments(selectedVolunteerIncident);
+    }
+  }, [selectedVolunteerIncident]);
+
+  const loadVolunteerAssignments = async (incidentId) => {
+    setLoadingVolunteers(true);
+    try {
+      const result = await ApiService.getIncidentVolunteerAssignments(incidentId);
+      if (result.success) {
+        setVolunteerAssignments(result.data);
+      }
+    } catch (error) {
+      console.error('Error cargando asignaciones de voluntarios:', error);
+      setVolunteerAssignments([]);
+    } finally {
+      setLoadingVolunteers(false);
+    }
+  };
+
   const handleSelectAll = () => {
     if (selectedItems?.length === incidents?.length) {
       setSelectedItems([]);
@@ -39,7 +98,7 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
     }
   };
 
-  const handleSelectItem = (id) => {
+ const handleSelectItem = (id) => {
     setSelectedItems(prev => 
       prev?.includes(id) 
         ? prev?.filter(item => item !== id)
@@ -74,14 +133,18 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
     if (assignedUser.trim() && assigningIncident) {
       setLoading(true);
       try {
+        // Encontrar el nombre del voluntario seleccionado
+        const selectedVolunteer = volunteersList.find(v => v.email === assignedUser);
+        const volunteerName = selectedVolunteer ? selectedVolunteer.name : 'Voluntario';
+        
         if (import.meta.env.VITE_API_URL) {
           const result = await ApiService.assignIncident(assigningIncident, assignedUser);
           if (result.success) {
-            onAssignIncident(assigningIncident, assignedUser);
+            onAssignIncident(assigningIncident, assignedUser, volunteerName);
           }
         } else {
           // Simulación si no hay backend configurado
-          onAssignIncident(assigningIncident, assignedUser);
+          onAssignIncident(assigningIncident, assignedUser, volunteerName);
         }
         setAssigningIncident(null);
         setAssignedUser('');
@@ -142,7 +205,7 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
     }
   };
 
-  const getStatusColor = (status) => {
+ const getStatusColor = (status) => {
     switch (status) {
       case 'active': return 'text-warning bg-warning/10';
       case 'in-progress': return 'text-primary bg-primary/10';
@@ -503,19 +566,54 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Asignar a:</label>
-                <select
-                  value={assignedUser}
-                  onChange={(e) => setAssignedUser(e.target.value)}
-                  className="w-full border border-border rounded px-3 py-2 bg-background"
-                  disabled={loading}
-                >
-                  <option value="">Seleccionar usuario...</option>
-                  <option value="Angel Guaño">Angel Guaño</option>
-                  <option value="Jhostin Quispe">Jhostin Quispe</option>
-                  <option value="Henry Redin">Henry Redin</option>
-                  <option value="Equipo de Soporte">Equipo de Soporte</option>
-                </select>
+                
+                {loadingVolunteersList ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Icon name="Refresh" size={20} className="animate-spin text-primary mr-2" />
+                    <span className="text-sm text-muted-foreground">Cargando voluntarios...</span>
+                  </div>
+                ) : (
+                  <select
+                    value={assignedUser}
+                    onChange={(e) => setAssignedUser(e.target.value)}
+                    className="w-full border border-border rounded px-3 py-2 bg-background"
+                    disabled={loading || volunteersList.length === 0}
+                  >
+                    <option value="">Seleccionar voluntario...</option>
+                    {volunteersList.map((volunteer) => (
+                      <option 
+                        key={volunteer.id} 
+                        value={volunteer.email} // Guardar el email para la asignación
+                      >
+                        {volunteer.name} - {volunteer.email}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                
+                {volunteersList.length === 0 && !loadingVolunteersList && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    No hay voluntarios disponibles en la base de datos
+                  </p>
+                )}
               </div>
+              
+              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                <span>
+                  {volunteersList.length} voluntario(s) disponible(s)
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadVolunteersList}
+                  iconName="Refresh"
+                  className="text-xs"
+                  disabled={loadingVolunteersList}
+                >
+                  Actualizar
+                </Button>
+              </div>
+              
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
@@ -526,7 +624,7 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
                 </Button>
                 <Button
                   onClick={handleAssignSubmit}
-                  disabled={!assignedUser || loading}
+                  disabled={!assignedUser || loading || volunteersList.length === 0}
                   loading={loading}
                 >
                   {loading ? 'Asignando...' : 'Asignar'}
@@ -571,6 +669,75 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+       {/* Modal de detalles de voluntarios - SOLO PARA ADMIN */}
+      {!volunteerView && selectedVolunteerIncident && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">Voluntarios Asignados</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setSelectedVolunteerIncident(null);
+                  setVolunteerAssignments([]);
+                }}
+                iconName="X"
+              />
+            </div>
+            
+            {loadingVolunteers ? (
+              <div className="flex items-center justify-center py-8">
+                <Icon name="Refresh" size={24} className="animate-spin text-primary" />
+                <span className="ml-2 text-sm text-muted-foreground">Cargando voluntarios...</span>
+              </div>
+            ) : volunteerAssignments.length > 0 ? (
+              <div className="space-y-3">
+                {volunteerAssignments.map(assignment => (
+                  <div key={assignment.id} className="border border-border rounded-lg p-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-medium">{assignment.volunteer_name || assignment.volunteer_email}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {assignment.volunteer_phone || 'Sin teléfono'}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        assignment.status === 'assigned' ? 'bg-blue-100 text-blue-800' :
+                        assignment.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {assignment.status === 'assigned' ? 'Asignado' :
+                         assignment.status === 'in_progress' ? 'En Progreso' : 'Completado'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Asignado: {new Date(assignment.assigned_at).toLocaleDateString('es-ES')}
+                    </p>
+                    {assignment.volunteer_skills && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {JSON.parse(assignment.volunteer_skills).map((skill, index) => (
+                          <span 
+                            key={index}
+                            className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-4">
+                No hay voluntarios asignados a este incidente
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -661,37 +828,80 @@ const IncidentList = ({ incidents, selectedIncident, onIncidentSelect, onStatusU
                     <div className="flex items-center space-x-1">
                       <Icon name="MapPin" size={14} />
                       <span className="truncate">
-                        {incident?.location_building || incident?.location?.building || 'Ubicación no especificada'}
+                        {incident?.location_building || 'Ubicación no especificada'}
                       </span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Icon name="Clock" size={14} />
                       <span>
-                        {incident?.reportedAt ? new Date(incident.reportedAt).toLocaleDateString() : 'Fecha no disponible'}
+                        {incident?.reported_at ? new Date(incident.reported_at).toLocaleDateString('es-ES') : 'Fecha no disponible'}
                       </span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Icon name="User" size={14} />
                       <span className="truncate">
-                        {incident?.reporter_full_name || incident?.reporter?.name || 'Reportante no especificado'}
+                        {incident?.reporter_full_name || 'Reportante no especificado'}
                       </span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Icon name="Users" size={14} />
-                      <span>{incident?.affectedUsers || 0} usuarios afectados</span>
+                      <span>{incident?.affected_users || 0} usuarios afectados</span>
                     </div>
                   </div>
 
-                  {/* Asignado a */}
+                  {/* Asignado a (personal/admin) */}
                   {incident?.assigned_to && (
                     <div className="bg-primary/10 rounded-lg p-2 mb-3">
                       <div className="flex items-center space-x-2 text-sm">
                         <Icon name="UserCheck" size={14} className="text-primary" />
                         <span className="text-primary font-medium">
-                          Asignado a: {incident.assigned_to}
+                          Asignado a: {incident.assigned_volunteer_name || incident.assigned_to}
                         </span>
                       </div>
                     </div>
+                  )}
+
+                  {/* Información de Voluntarios - SOLO PARA ADMIN */}
+                  {!volunteerView && (
+                    <>
+                      {incident.current_volunteers > 0 && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-2 mb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Icon name="Users" size={14} className="text-green-600" />
+                              <span className="text-green-700 font-medium">
+                                {incident.current_volunteers} 
+                                {incident.volunteers_needed ? `/${incident.volunteers_needed}` : ''} 
+                                voluntario(s) asignado(s)
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e?.stopPropagation();
+                                setSelectedVolunteerIncident(incident.id);
+                              }}
+                              iconName="Eye"
+                              className="text-xs"
+                            >
+                              Ver
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {incident.volunteers_needed > 0 && incident.current_volunteers === 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3">
+                          <div className="flex items-center space-x-2 text-sm">
+                            <Icon name="UserPlus" size={14} className="text-yellow-600" />
+                            <span className="text-yellow-700">
+                              Se necesitan {incident.volunteers_needed} voluntario(s)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Comentarios recientes */}

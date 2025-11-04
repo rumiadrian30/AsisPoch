@@ -269,20 +269,6 @@ const IncidentFilters = ({ filters, onFiltersChange, onClearFilters }) => {
                 ))}
               </div>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-muted-foreground">Voluntarios:</span>
-              <select
-                value={filters.volunteerStatus || 'all'}
-                onChange={(e) => handleFilterChange('volunteerStatus', e.target.value)}
-                className="text-sm border border-border rounded px-2 py-1 bg-background"
-              >
-                <option value="all">Todos</option>
-                <option value="with_volunteers">Con voluntarios</option>
-                <option value="without_volunteers">Sin voluntarios</option>
-                <option value="needs_volunteers">Necesita voluntarios</option>
-              </select>
-            </div>
           </div>
 
           {/* Filter Actions */}

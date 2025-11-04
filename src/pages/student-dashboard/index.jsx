@@ -9,17 +9,11 @@ import AccessibleMapView from './components/AccessibleMapView';
 import NotificationPanel from './components/NotificationPanel';
 import AccessibilityPreferences from './components/AccessibilityPreferences';
 import AlertBanner from './components/AlertBanner';
+import { useAuth } from '../../contexts/AuthContext'; // Importar el contexto de autenticación
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
-  const [currentUser] = useState({
-    id: 1,
-    name: "Rumi Adrian Grefa Rivadeneyra",
-    email: "rui.grefa@espoch.edu.ec",
-    studentId: "7333",
-    faculty: "Facultad de Informática y Electrónica",
-    accessibilityNeeds: ["wheelchair", "visual_support"]
-  });
+  const { user, logout } = useAuth(); // Obtener usuario del contexto
 
   const [activeRequests, setActiveRequests] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('connected');
@@ -117,8 +111,24 @@ const StudentDashboard = () => {
     navigate('/route-navigation', { state: { avoidLocation: alert?.location } });
   };
 
+  const handleRoleSwitch = (newRole) => {
+    console.log('Switching to role:', newRole);
+    // Aquí puedes implementar la lógica para cambiar de rol si es necesario
+  };
+
   const handleAlertViewDetails = (alert) => {
-    navigate('/incident-reporting', { state: { viewIncident: alert?.id } });
+    console.log('Viendo detalles de:', alert);
+    // Esta función ahora se maneja internamente en el AlertBanner
+  };
+
+  // Datos del usuario basados en la autenticación
+  const currentUser = {
+    id: user?.userId || 1,
+    name: user?.fullName || "Estudiante ESPOCH",
+    email: user?.email || "estudiante@espoch.edu.ec",
+    studentId: user?.studentId || "7333",
+    faculty: user?.faculty || "Facultad de Informática y Electrónica",
+    accessibilityNeeds: user?.accessibilityNeeds || ["wheelchair", "visual_support"]
   };
 
   const quickActions = [
@@ -166,8 +176,13 @@ const StudentDashboard = () => {
     <div className="min-h-screen bg-background">
       <Header 
         userRole="student" 
+        userEmail={user?.email}
+        userName={user?.fullName}
         onEmergencyRequest={handleEmergencyRequest}
+        onRoleSwitch={handleRoleSwitch}
+        onLogout={logout}
       />
+      
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-6 border border-primary/20">
@@ -356,7 +371,7 @@ const StudentDashboard = () => {
             }}
             onSavePreferences={(preferences) => {
               console.log('Saving preferences:', preferences);
-              // Here you would typically save to backend
+              // Aquí guardarías en el backend con el userId
             }}
             onUpdatePreferences={(preferences) => {
               console.log('Updating preferences:', preferences);

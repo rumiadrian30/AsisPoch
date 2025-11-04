@@ -180,6 +180,11 @@ const CampusIncidentMonitor = () => {
     if (filters?.severity && filters?.severity !== 'all' && incident?.severity !== filters?.severity) return false;
     if (filters?.type && filters?.type !== 'all' && incident?.type !== filters?.type) return false;
     if (filters?.location && !incident?.location_building?.toLowerCase()?.includes(filters?.location?.toLowerCase())) return false;
+    // Filtro por estado de voluntarios
+    if (filters.volunteerStatus === 'with_volunteers' && incident.current_volunteers === 0) return false;
+    if (filters.volunteerStatus === 'without_volunteers' && incident.current_volunteers > 0) return false;
+    if (filters.volunteerStatus === 'needs_volunteers' && 
+        (!incident.volunteers_needed || incident.current_volunteers >= incident.volunteers_needed)) return false;
     return true;
   });
 
