@@ -32,8 +32,8 @@ Sistema de asistencia y accesibilidad para la comunidad ESPOCH, diseñado para a
    ```
    npm install --save-dev @types/babel__traverse
    
-2. Start the development server:
-   ```tanto en backend como en la ruta principal ejecutar
+2. Start the development server (tanto en backend como en la ruta principal ejecutar):
+   ```
    npm run start
 
    ```
@@ -101,6 +101,7 @@ react_app/
 ```
 ## Implementación del Patrón Chain of Responsibility
 ## Estructura de Clases Base
+```
 src/
 ├── patterns/
 │   ├── chain-of-responsibility/
@@ -122,6 +123,7 @@ src/
 │   │   ├── BaseHandler.js
 │   │   ├── IncidentChain.js
 │   │   └── IncidentContext.js
+```
 ```
 ```
 ## 🧩 Adding Routes
