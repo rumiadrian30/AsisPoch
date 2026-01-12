@@ -9,6 +9,7 @@ import CampusIncidentMonitor from './pages/campus-incident-monitor';
 import StudentDashboard from './pages/student-dashboard';
 import IncidentReporting from './pages/incident-reporting';
 import RouteNavigation from './pages/route-navigation';
+import Volunteers from './pages/Volunteers';
 
 const Routes = () => {
   return (
@@ -24,6 +25,7 @@ const Routes = () => {
         <Route path="/student-dashboard" element={<StudentDashboard />} />
         <Route path="/incident-reporting" element={<IncidentReporting />} />
         <Route path="/route-navigation" element={<RouteNavigation />} />
+        <Route path="/Voluntees" element={<Volunteers/>} />
         <Route path="*" element={<NotFound />} />
       </RouterRoutes>
       </ErrorBoundary>

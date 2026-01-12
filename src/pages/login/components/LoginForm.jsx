@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import Icon from '../../../components/AppIcon';
+import { AuthService } from '../../../services/apiService';
 
 const LoginForm = ({ onLogin, isLoading }) => {
   const [formData, setFormData] = useState({
@@ -13,14 +14,8 @@ const LoginForm = ({ onLogin, isLoading }) => {
   });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  // Mock credentials for different user types
-  const mockCredentials = {
-    student: { email: 'estudiante@espoch.edu.ec', password: 'Estudiante2024!' },
-    staff: { email: 'personal@espoch.edu.ec', password: 'Personal2024!' },
-    admin: { email: 'admin@espoch.edu.ec', password: 'Admin2024!' }
-  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e?.target;
@@ -61,56 +56,86 @@ const LoginForm = ({ onLogin, isLoading }) => {
       return;
     }
 
-    // Check against mock credentials
-    const userType = Object.keys(mockCredentials)?.find(type => 
-      mockCredentials?.[type]?.email === formData?.email && 
-      mockCredentials?.[type]?.password === formData?.password
-    );
+    setLoading(true);
+    setErrors({});
 
-    if (!userType) {
+    try {
+      const result = await AuthService.login(formData.email, formData.password);
+
+      if (result.success) {
+        // Guardar en localStorage si seleccionó "Recordar sesión"
+        if (formData.rememberMe) {
+          localStorage.setItem('rememberMe', 'true');
+          localStorage.setItem('userEmail', formData.email);
+        } else {
+          localStorage.removeItem('rememberMe');
+          localStorage.removeItem('userEmail');
+        }
+
+        if (onLogin) {
+          await onLogin(result.data.user, result.data.user.userType);
+        }
+
+        // Navigate based on user type
+        switch (result.data.user.userType) {
+          case 'student': 
+            navigate('/student-dashboard');
+            break;
+          case 'staff': 
+          case 'admin': 
+            navigate('/campus-incident-monitor');
+            break;
+          case 'volunteer': 
+            navigate('/Volunteers');
+            break;
+          default:
+            navigate('/student-dashboard');
+        }
+      } else {
+        setErrors({
+          general: result.error || 'Credenciales incorrectas'
+        });
+      }
+    } catch (error) {
+      console.error('Error en login:', error);
       setErrors({
-        general: 'Credenciales incorrectas. Use: estudiante@espoch.edu.ec / Estudiante2024! o personal@espoch.edu.ec / Personal2024! o admin@espoch.edu.ec / Admin2024!'
+        general: 'Error de conexión. Intente nuevamente.'
       });
-      return;
-    }
-
-    if (onLogin) {
-      await onLogin(formData, userType);
-    }
-
-    // Navigate based on user type
-    switch (userType) {
-      case 'student': navigate('/student-dashboard');
-        break;
-      case 'staff': navigate('/campus-incident-monitor');
-        break;
-      case 'admin': navigate('/campus-incident-monitor');
-        break;
-      default:
-        navigate('/student-dashboard');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleForgotPassword = () => {
-    // Mock forgot password functionality
-    alert('Se ha enviado un enlace de recuperación a su correo electrónico');
+    alert('Función de recuperación de contraseña en desarrollo');
   };
+
+  // Cargar datos guardados al montar el componente
+  React.useEffect(() => {
+    const rememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('userEmail');
+    
+    if (rememberMe && savedEmail) {
+      setFormData(prev => ({
+        ...prev,
+        email: savedEmail,
+        rememberMe: true
+      }));
+    }
+  }, []);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6" noValidate>
       {/* General Error Message */}
       {errors?.general && (
-        <div 
-          className="p-4 bg-error/10 border border-error/20 rounded-lg"
-          role="alert"
-          aria-live="polite"
-        >
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg">
           <div className="flex items-start space-x-3">
             <Icon name="AlertCircle" size={20} className="text-error mt-0.5 flex-shrink-0" />
             <p className="text-sm text-error font-medium">{errors?.general}</p>
           </div>
         </div>
       )}
+      
       {/* Email Field */}
       <div>
         <Input
@@ -123,13 +148,9 @@ const LoginForm = ({ onLogin, isLoading }) => {
           error={errors?.email}
           required
           autoComplete="email"
-          aria-describedby="email-help"
-          className="w-full"
         />
-        <p id="email-help" className="mt-1 text-xs text-muted-foreground">
-          Use su correo institucional de ESPOCH
-        </p>
       </div>
+
       {/* Password Field */}
       <div>
         <div className="relative">
@@ -148,13 +169,13 @@ const LoginForm = ({ onLogin, isLoading }) => {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-9 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            className="absolute right-3 top-9 text-muted-foreground hover:text-foreground"
           >
             <Icon name={showPassword ? "EyeOff" : "Eye"} size={20} />
           </button>
         </div>
       </div>
+
       {/* Remember Me Checkbox */}
       <div className="flex items-center justify-between">
         <Checkbox
@@ -162,30 +183,31 @@ const LoginForm = ({ onLogin, isLoading }) => {
           label="Recordar sesión"
           checked={formData?.rememberMe}
           onChange={handleInputChange}
-          className="text-sm"
         />
         
         <button
           type="button"
           onClick={handleForgotPassword}
-          className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+          className="text-sm text-primary hover:text-primary/80"
         >
           ¿Olvidó su contraseña?
         </button>
       </div>
+
       {/* Login Button */}
       <Button
         type="submit"
         variant="default"
         size="lg"
-        loading={isLoading}
+        loading={loading}
         iconName="LogIn"
         iconPosition="right"
         fullWidth
         className="mt-8"
       >
-        {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+        {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
       </Button>
+
       {/* Demo Credentials Info */}
       <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
         <h4 className="text-sm font-medium text-foreground mb-2 flex items-center">
@@ -193,14 +215,13 @@ const LoginForm = ({ onLogin, isLoading }) => {
           Credenciales de Demostración
         </h4>
         <div className="space-y-2 text-xs text-muted-foreground">
-          <div>
-            <strong>Estudiante:</strong> estudiante@espoch.edu.ec / Estudiante2024!
-          </div>
-          <div>
-            <strong>Personal:</strong> personal@espoch.edu.ec / Personal2024!
-          </div>
-          <div>
-            <strong>Administrador:</strong> admin@espoch.edu.ec / Admin2024!
+          <div><strong>Email:</strong> cualquiera de los listados abajo</div>
+          <div><strong>Contraseña:</strong> password</div>
+          <div className="mt-2">
+            <strong>Usuarios disponibles:</strong><br/>
+            • estudiante@espoch.edu.ec (Estudiante)<br/>
+            • admin@espoch.edu.ec (Administrador)<br/>
+            • voluntario@espoch.edu.ec (Voluntario)
           </div>
         </div>
       </div>

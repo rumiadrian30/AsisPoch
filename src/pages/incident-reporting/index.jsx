@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -14,6 +14,10 @@ import PhotoUpload from './components/PhotoUpload';
 import AccessibilityFeatures from './components/AccessibilityFeatures';
 import ContactPreferences from './components/ContactPreferences';
 
+// Import Chain of Responsibility
+import IncidentChain from '../../patterns/incident-chain/IncidentChain';
+import IncidentContext from '../../patterns/incident-chain/IncidentContext';
+
 const IncidentReporting = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,6 +25,11 @@ const IncidentReporting = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  
+  // Chain of Responsibility states
+  const [chainProgress, setChainProgress] = useState([]);
+  const [processingResult, setProcessingResult] = useState(null);
+  const incidentChainRef = useRef(null);
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -70,6 +79,12 @@ const IncidentReporting = () => {
     { id: 6, title: 'Información de Contacto', icon: 'User' }
   ];
 
+  // Inicializar la cadena
+  useEffect(() => {
+    incidentChainRef.current = new IncidentChain();
+    console.log('🔗 IncidentChain inicializado:', incidentChainRef.current.getChainInfo());
+  }, []);
+
   // Check for emergency mode from navigation state
   useEffect(() => {
     if (location?.state?.emergency) {
@@ -77,7 +92,8 @@ const IncidentReporting = () => {
         ...prev,
         severity: 'critical',
         urgencyLevel: 'immediate',
-        title: 'Incidente de Emergencia - ' + new Date().toLocaleString()
+        title: 'Incidente de Emergencia - ' + new Date().toLocaleString(),
+        emergency: true
       }));
     }
   }, [location?.state]);
@@ -161,14 +177,16 @@ const IncidentReporting = () => {
     }
   };
 
-  // Form submission
+  // Form submission con Chain of Responsibility
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) return;
 
     setIsSubmitting(true);
+    setChainProgress(['🔗 Iniciando cadena de procesamiento...']);
+    setProcessingResult(null);
 
     try {
-      // Preparar datos para el API
+      // Preparar datos para la cadena
       const incidentData = {
         title: formData.title || `Incidente de ${formData.incidentTypes.join(', ')}`,
         description: formData.description,
@@ -181,29 +199,74 @@ const IncidentReporting = () => {
         estimatedImpact: formData.estimatedImpact,
         routeImpact: formData.routeImpact,
         affectedUsers: formData.affectedUsers || 1,
-        photos: formData.photos
+        photos: formData.photos,
+        emergency: location?.state?.emergency || formData.severity === 'critical',
+        timestamp: new Date().toISOString(),
+        campus: 'ESPOCH',
+        reporterId: `USER-${Math.random().toString(36).substring(2, 9)}`
+      };
+
+      console.log('🚀 Enviando a IncidentChain:', incidentData);
+      
+      // Actualizar progreso
+      setChainProgress(prev => [...prev, '📋 Datos preparados', '🔗 Ejecutando cadena de incidentes...']);
+
+      // Procesar a través de la cadena
+      const result = await incidentChainRef.current.processIncident(incidentData);
+      
+      // Guardar resultado
+      setProcessingResult(result);
+      
+      // Mostrar progreso de handlers procesados
+      const handlers = result.processedBy.map(p => 
+        `✅ ${p.handler.replace('Handler', '')} (${new Date(p.timestamp).toLocaleTimeString()})`
+      );
+      setChainProgress(prev => [...prev, ...handlers, '🎉 Procesamiento completado']);
+
+      console.log('📊 Resultado del IncidentChain:', result.toJSON());
+      
+      // Extraer tracking number y datos para la API
+      const trackingNumber = result.data.documentation?.trackingNumber;
+      const apiData = {
+        ...incidentData,
+        trackingNumber,
+        documentation: result.data.documentation,
+        accessibilityAnalysis: result.data.accessibilityAnalysis,
+        infrastructureAnalysis: result.data.infrastructureAnalysis,
+        notifications: result.data.notifications,
+        processedByChain: true,
+        chainResult: result.toJSON()
       };
 
       // Enviar al backend
-      const result = await ApiService.createIncident(incidentData);
+      const apiResult = await ApiService.createIncident(apiData);
 
-      // Navegar a la página de éxito
+      // Actualizar progreso
+      setChainProgress(prev => [...prev, '📡 Datos enviados al servidor']);
+
+      // Navegar a la página de éxito con información de la cadena
       navigate('/student-dashboard', {
         state: {
           reportSubmitted: true,
-          trackingNumber: result.trackingNumber,
+          trackingNumber: trackingNumber,
           severity: formData.severity,
-          estimatedResolution: getEstimatedResolution(formData.severity)
+          estimatedResolution: result.data.estimatedResolution,
+          processedByChain: true,
+          chainHandlers: result.processedBy.map(p => p.handler.replace('Handler', '')),
+          chainDuration: result.metadata?.duration
         }
       });
 
     } catch (error) {
-      console.error('Error submitting report:', error);
-      setErrors({ submit: 'Error al enviar el reporte. Por favor intenta nuevamente.' });
+      console.error('❌ Error en IncidentChain:', error);
+      setErrors({ submit: `Error al procesar el reporte: ${error.message}` });
+      setChainProgress(prev => [...prev, `❌ Error: ${error.message}`]);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Resto del código se mantiene igual hasta el return...
 
   const getEstimatedResolution = (severity) => {
     const resolutionTimes = {
@@ -374,7 +437,7 @@ const IncidentReporting = () => {
     }
   };
 
-  // Resto del componente se mantiene igual...
+  // Añadir sección de Chain Progress en el render
   return (
     <div className="min-h-screen bg-background">
       <Header userRole="student" />
@@ -395,18 +458,50 @@ const IncidentReporting = () => {
             </div>
           </div>
 
-          {location?.state?.emergency && (
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg mb-6">
-              <div className="flex items-center space-x-2 text-destructive">
-                <Icon name="AlertCircle" size={20} />
-                <span className="font-medium">Modo de Emergencia Activado</span>
+          {/* Chain of Responsibility Info */}
+          <div className="flex items-center justify-between mb-6">
+            {location?.state?.emergency && (
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex-1 mr-4">
+                <div className="flex items-center space-x-2 text-destructive">
+                  <Icon name="AlertCircle" size={20} />
+                  <span className="font-medium">Modo de Emergencia Activado</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Este reporte será procesado con prioridad alta para atención inmediata.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                Este reporte será procesado con prioridad alta para atención inmediata.
-              </p>
+            )}
+            
+            <div className="text-sm text-muted-foreground bg-primary/10 px-3 py-1 rounded-full whitespace-nowrap">
+              🏗️ Chain of Responsibility
             </div>
-          )}
+          </div>
         </div>
+
+        {/* Chain of Responsibility Progress */}
+        {isSubmitting && chainProgress.length > 0 && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <Icon name="GitBranch" size={20} className="text-blue-600" />
+              <h3 className="font-semibold text-blue-800">Chain of Responsibility en acción</h3>
+            </div>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {chainProgress.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`text-sm flex items-center space-x-2 ${
+                    item.includes('✅') ? 'text-green-700' : 
+                    item.includes('❌') ? 'text-red-700' : 
+                    'text-blue-700'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-current"></div>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Progress Steps */}
         <div className="mb-8">
@@ -504,7 +599,7 @@ const IncidentReporting = () => {
                 iconName="Send"
                 iconPosition="left"
               >
-                Enviar Reporte
+                {isSubmitting ? 'Procesando...' : 'Enviar Reporte'}
               </Button>
             )}
           </div>
@@ -519,6 +614,43 @@ const IncidentReporting = () => {
             </div>
           </div>
         )}
+
+        {/* Chain of Responsibility Info Section */}
+        <div className="mt-8 p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <Icon name="GitBranch" size={20} className="text-primary mt-0.5" />
+            <div>
+              <h4 className="font-medium text-foreground mb-2">
+                🏗️ Procesamiento con Chain of Responsibility
+              </h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                Tu reporte será procesado automáticamente por nuestra cadena de responsabilidad:
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                <div className="p-2 bg-blue-50 border border-blue-200 rounded">
+                  <div className="font-medium text-blue-700">🚨 Emergencia</div>
+                  <div className="text-blue-600">Criticidad máxima</div>
+                </div>
+                <div className="p-2 bg-green-50 border border-green-200 rounded">
+                  <div className="font-medium text-green-700">♿ Accesibilidad</div>
+                  <div className="text-green-600">Impacto en movilidad</div>
+                </div>
+                <div className="p-2 bg-orange-50 border border-orange-200 rounded">
+                  <div className="font-medium text-orange-700">🏗️ Infraestructura</div>
+                  <div className="text-orange-600">Daños estructurales</div>
+                </div>
+                <div className="p-2 bg-purple-50 border border-purple-200 rounded">
+                  <div className="font-medium text-purple-700">📄 Documentación</div>
+                  <div className="text-purple-600">Registro completo</div>
+                </div>
+                <div className="p-2 bg-red-50 border border-red-200 rounded">
+                  <div className="font-medium text-red-700">📢 Notificaciones</div>
+                  <div className="text-red-600">Alertas automáticas</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Help Section */}
         <div className="mt-8 p-4 bg-muted/50 rounded-lg">

@@ -12,7 +12,7 @@ const checkBackendAvailability = async () => {
       signal: AbortSignal.timeout(3000) // Timeout de 3 segundos
     });
     backendAvailable = response.ok;
-    console.log(backendAvailable ? '✅ Backend disponible para assistance requests' : '❌ Backend no disponible');
+    console.log(backendAvailable ? 'Backend disponible para assistance requests' : 'Backend no disponible');
   } catch (error) {
     backendAvailable = false;
     console.log('🔧 Modo simulación activado para assistance requests - Backend no disponible');

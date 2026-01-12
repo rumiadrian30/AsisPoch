@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Header from '../../components/ui/Header';
 import AssistanceTypeSelector from './components/AssistanceTypeSelector';
@@ -9,6 +9,8 @@ import RequestForm from './components/RequestForm';
 import ConfirmationModal from './components/ConfirmationModal';
 import Button from '../../components/ui/Button';
 import Icon from '../../components/AppIcon';
+import AssistanceChain from '../../patterns/chain-of-responsibility/AssistanceChain';
+import RequestContext from '../../patterns/chain-of-responsibility/RequestContext';
 
 const RequestAssistance = () => {
   const location = useLocation();
@@ -31,8 +33,18 @@ const RequestAssistance = () => {
   const [correlationId, setCorrelationId] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [userRole] = useState('student');
+  const [processingResult, setProcessingResult] = useState(null);
+  const [chainProgress, setChainProgress] = useState([]);
 
   const totalSteps = 5;
+  const assistanceChainRef = useRef(null);
+
+  // Inicializar la cadena una vez
+  useEffect(() => {
+    assistanceChainRef.current = new AssistanceChain();
+    console.log('🔗 Chain of Responsibility inicializado:', 
+      assistanceChainRef.current.getChainInfo());
+  }, []);
 
   // Generate correlation ID
   const generateCorrelationId = () => {
@@ -41,7 +53,7 @@ const RequestAssistance = () => {
     return `REQ-${timestamp}-${random}`.toUpperCase();
   };
 
-  // Form validation - USAR useCallback PARA EVITAR RE-RENDERS
+  // Form validation
   const validateCurrentStep = useCallback(() => {
     const errors = {};
 
@@ -82,7 +94,7 @@ const RequestAssistance = () => {
     return Object.keys(errors).length === 0;
   }, [currentStep, assistanceType, selectedLocation, urgencyLevel, communicationMethod, description]);
 
-  // Navigation handlers - CORREGIDOS
+  // Navigation handlers
   const handleNext = () => {
     if (validateCurrentStep()) {
       setCurrentStep(prev => Math.min(prev + 1, totalSteps));
@@ -91,35 +103,75 @@ const RequestAssistance = () => {
 
   const handlePrevious = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
-    // Limpiar errores al retroceder
     setFormErrors({});
   };
 
-  // CORREGIDO: Eliminar la validación del paso click para evitar loops
   const handleStepClick = (step) => {
-    // Solo permitir navegar a pasos anteriores o actual
     if (step <= currentStep) {
       setCurrentStep(step);
       setFormErrors({});
     }
-    // No permitir saltar a pasos futuros sin validar
   };
 
-  // Form submission
+  // Form submission con Chain of Responsibility
   const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
 
     setIsSubmitting(true);
+    setChainProgress(['🔗 Iniciando procesamiento...']);
     
     try {
+      // Generar correlation ID
       const newCorrelationId = generateCorrelationId();
       setCorrelationId(newCorrelationId);
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setShowConfirmation(true);
+      // Preparar datos para la cadena
+      const requestData = {
+        assistanceType,
+        location: selectedLocation,
+        urgency: urgencyLevel,
+        urgencyLevel, // Alias para compatibilidad
+        accessibilityNeeds,
+        communicationMethod,
+        specialRequirements,
+        description,
+        userRole,
+        correlationId: newCorrelationId,
+        timestamp: new Date().toISOString(),
+        campus: 'ESPOCH',
+        userId: `USER-${Math.random().toString(36).substring(2, 9)}`
+      };
+
+      console.log('🚀 Enviando a Chain of Responsibility:', requestData);
+      
+      // Actualizar progreso
+      setChainProgress(prev => [...prev, '📋 Datos preparados', '🔗 Ejecutando cadena...']);
+
+      // Procesar a través de la cadena
+      const result = await assistanceChainRef.current.processRequest(requestData);
+      
+      // Guardar resultado
+      setProcessingResult(result);
+      
+      // Mostrar progreso de handlers procesados
+      const handlers = result.processedBy.map(p => 
+        `✅ ${p.handler} (${new Date(p.timestamp).toLocaleTimeString()})`
+      );
+      setChainProgress(prev => [...prev, ...handlers, '🎉 Procesamiento completado']);
+
+      console.log('📊 Resultado del Chain of Responsibility:', result.toJSON());
+      
+      // Mostrar confirmation modal después de 1 segundo
+      setTimeout(() => {
+        setShowConfirmation(true);
+      }, 1000);
+
     } catch (error) {
-      console.error('Error submitting request:', error);
-      setFormErrors({ submit: 'Error al enviar la solicitud. Inténtalo de nuevo.' });
+      console.error('❌ Error en Chain of Responsibility:', error);
+      setFormErrors({ 
+        submit: `Error al procesar la solicitud: ${error.message}` 
+      });
+      setChainProgress(prev => [...prev, `❌ Error: ${error.message}`]);
     } finally {
       setIsSubmitting(false);
     }
@@ -128,17 +180,19 @@ const RequestAssistance = () => {
   // Handle confirmation modal close
   const handleConfirmationClose = () => {
     setShowConfirmation(false);
+    setProcessingResult(null);
+    setChainProgress([]);
     navigate('/student-dashboard');
   };
 
-  // Emergency mode setup - CORREGIDO para evitar loops
+  // Emergency mode setup
   useEffect(() => {
     if (isEmergency && currentStep === 1) {
       setAssistanceType('emergency');
       setUrgencyLevel('critical');
       setCurrentStep(2);
     }
-  }, [isEmergency, currentStep]); // Agregar currentStep como dependencia
+  }, [isEmergency, currentStep]);
 
   // Step configuration
   const steps = [
@@ -191,10 +245,11 @@ const RequestAssistance = () => {
     accessibilityNeeds,
     communicationMethod,
     specialRequirements,
-    description
+    description,
+    correlationId,
+    processedByChain: processingResult ? true : false
   };
 
-  // Render simplificado para evitar loops
   return (
     <div className="min-h-screen bg-background">
       <Header userRole={userRole} />
@@ -208,7 +263,7 @@ const RequestAssistance = () => {
               <div>
                 <h2 className="font-semibold text-red-800">Modo de Emergencia Activado</h2>
                 <p className="text-sm text-red-700">
-                  Tu solicitud será procesada con máxima prioridad.
+                  Tu solicitud será procesada con máxima prioridad usando Chain of Responsibility.
                 </p>
               </div>
             </div>
@@ -217,15 +272,22 @@ const RequestAssistance = () => {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Solicitar Asistencia
-          </h1>
-          <p className="text-muted-foreground">
-            Completa el formulario para solicitar ayuda del personal de apoyo de ESPOCH
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                Solicitar Asistencia
+              </h1>
+              <p className="text-muted-foreground">
+                Completa el formulario para solicitar ayuda del personal de apoyo de ESPOCH
+              </p>
+            </div>
+            <div className="text-sm text-muted-foreground bg-primary/10 px-3 py-1 rounded-full">
+              🏗️ Chain of Responsibility
+            </div>
+          </div>
         </div>
 
-        {/* Progress Indicator - SIMPLIFICADO */}
+        {/* Progress Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             {steps.map((step, index) => (
@@ -276,6 +338,31 @@ const RequestAssistance = () => {
             ))}
           </div>
         </div>
+
+        {/* Chain of Responsibility Progress */}
+        {isSubmitting && chainProgress.length > 0 && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <Icon name="GitBranch" size={20} className="text-blue-600" />
+              <h3 className="font-semibold text-blue-800">Chain of Responsibility en acción</h3>
+            </div>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {chainProgress.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`text-sm flex items-center space-x-2 ${
+                    item.includes('✅') ? 'text-green-700' : 
+                    item.includes('❌') ? 'text-red-700' : 
+                    'text-blue-700'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-current"></div>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Form Content */}
         <div className="bg-card border border-border rounded-lg p-6 mb-6">
@@ -379,6 +466,8 @@ const RequestAssistance = () => {
         requestData={requestData}
         correlationId={correlationId}
         estimatedResponseTime={getEstimatedResponseTime()}
+        processingResult={processingResult}
+        chainProgress={chainProgress}
       />
     </div>
   );

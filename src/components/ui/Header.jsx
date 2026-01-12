@@ -3,7 +3,15 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
 
-const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, accessibilityConfig = {} }) => {
+const Header = ({ 
+  userRole = 'student', 
+  userEmail = '', 
+  userName = '', 
+  onEmergencyRequest, 
+  onRoleSwitch, 
+  onLogout,
+  accessibilityConfig = {} 
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isEmergencyMode, setIsEmergencyMode] = useState(false);
@@ -16,8 +24,11 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
   const getDashboardPath = () => {
     switch (userRole) {
       case 'admin':
+        return '/campus-incident-monitor';
       case 'staff':
         return '/campus-incident-monitor';
+      case 'volunteer':
+        return '/volunteers';
       case 'student':
       default:
         return '/student-dashboard';
@@ -28,11 +39,59 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
   const getDashboardLabel = () => {
     switch (userRole) {
       case 'admin':
+        return 'Panel Admin';
       case 'staff':
-        return 'Monitor';
+        return 'Monitor Campus';
+      case 'volunteer':
+        return 'Portal Voluntarios';
       case 'student':
       default:
-        return 'Dashboard';
+        return 'Mi Dashboard';
+    }
+  };
+
+  // Función para obtener el título del sistema según el rol
+  const getSystemTitle = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Sistema de Gestión - Administrador';
+      case 'staff':
+        return 'Monitor de Incidentes - Personal';
+      case 'volunteer':
+        return 'Portal de Voluntarios - ESPOCH';
+      case 'student':
+      default:
+        return 'AsisPoch - Estudiante';
+    }
+  };
+
+  // Función para obtener el nombre del rol en español
+  const getRoleLabel = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Administrador';
+      case 'staff':
+        return 'Personal ESPOCH';
+      case 'volunteer':
+        return 'Voluntario';
+      case 'student':
+      default:
+        return 'Estudiante';
+    }
+  };
+
+  // Función para obtener el icono del dashboard según el rol
+  const getDashboardIcon = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Settings';
+      case 'staff':
+        return 'Monitor';
+      case 'volunteer':
+        return 'Users';
+      case 'student':
+      default:
+        return 'LayoutDashboard';
     }
   };
 
@@ -41,42 +100,54 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
     {
       label: getDashboardLabel(),
       path: getDashboardPath(),
-      icon: userRole === 'admin' || userRole === 'staff' ? 'Monitor' : 'LayoutDashboard',
-      roles: ['student', 'staff', 'admin']
+      icon: getDashboardIcon(),
+      roles: ['student', 'staff', 'admin', 'volunteer']
     },
     {
-      label: 'Ayuda',
+      label: 'Solicitar Ayuda',
       path: '/request-assistance',
       icon: 'HelpCircle',
-      roles: ['student', 'staff', 'admin'],
+      roles: ['student', 'staff', 'admin', 'volunteer'],
       isEmergencyAccess: true
     },
     {
-      label: 'Navegar',
+      label: 'Navegación',
       path: '/route-navigation',
       icon: 'Navigation',
-      roles: ['student', 'staff', 'admin']
+      roles: ['student', 'staff', 'admin', 'volunteer']
     },
     {
-      label: 'Informar Problema',
+      label: 'Reportar Incidente',
       path: '/incident-reporting',
       icon: 'AlertTriangle',
-      roles: ['student', 'staff', 'admin']
+      roles: ['student', 'staff', 'admin', 'volunteer']
+    },
+    {
+      label: 'Gestión Avanzada',
+      path: '/admin-dashboard',
+      icon: 'Settings',
+      roles: ['admin']
     }
   ];
 
   const secondaryNavItems = [
     {
-      label: 'Dashboard Estudiante',
-      path: '/student-dashboard',
-      icon: 'LayoutDashboard',
-      roles: ['staff', 'admin']
+      label: 'Estadísticas',
+      path: '/statistics',
+      icon: 'BarChart3',
+      roles: ['admin', 'staff']
     },
     {
-      label: 'Gestión Avanzada',
-      path: '/admin-dashboard', // Puedes crear esta ruta después
-      icon: 'Settings',
+      label: 'Gestión de Usuarios',
+      path: '/user-management',
+      icon: 'Users',
       roles: ['admin']
+    },
+    {
+      label: 'Configuración',
+      path: '/settings',
+      icon: 'Settings',
+      roles: ['admin', 'staff']
     }
   ];
 
@@ -92,7 +163,7 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
   // Handle navigation with role-based routing
   const handleNavigation = (path) => {
     // Si es el dashboard, usar la ruta basada en el rol
-    if (path === '/student-dashboard' || path === '/campus-incident-monitor') {
+    if (path === '/student-dashboard' || path === '/campus-incident-monitor' || path === '/volunteers') {
       navigate(getDashboardPath());
     } else {
       navigate(path);
@@ -121,6 +192,14 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
     setTimeout(() => {
       navigate(getDashboardPath());
     }, 100);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+    }
+    navigate('/login');
   };
 
   // Close mobile menu when route changes
@@ -164,7 +243,7 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
 
   // Determinar si el item actual está activo
   const isItemActive = (item) => {
-    if (item.path === '/student-dashboard' || item.path === '/campus-incident-monitor') {
+    if (item.path === '/student-dashboard' || item.path === '/campus-incident-monitor' || item.path === '/volunteers') {
       return location.pathname === getDashboardPath();
     }
     return location.pathname === item.path;
@@ -188,11 +267,10 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
               </div>
               <div className="hidden sm:block">
                 <h1 className="font-heading font-semibold text-lg text-foreground">
-                  AsisPoch
+                  {getSystemTitle()}
                 </h1>
                 <p className="font-caption text-xs text-muted-foreground -mt-1">
-                  {userRole === 'admin' ? 'Administrador' : 
-                   userRole === 'staff' ? 'Personal' : 'Estudiante'}
+                  ESPOCH - Sistema de Accesibilidad
                 </p>
               </div>
             </div>
@@ -307,7 +385,7 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
                   connectionStatus === 'connected' ? 'bg-success' : 'bg-error'
                 }`} />
                 <span className="text-xs font-caption text-muted-foreground">
-                  {connectionStatus === 'connected' ? 'Online' : 'Offline'}
+                  {connectionStatus === 'connected' ? 'Conectado' : 'Desconectado'}
                 </span>
               </div>
               
@@ -339,34 +417,54 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
                 <Icon name="User" size={14} className="text-primary-foreground" />
               </div>
               <div className="text-sm">
-                <p className="font-medium text-foreground capitalize">
-                  {userRole === 'admin' ? 'Administrador' : 
-                   userRole === 'staff' ? 'Personal' : 'Estudiante'}
+                <p className="font-medium text-foreground">
+                  {userName || getRoleLabel()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {userEmail || getRoleLabel()}
                 </p>
               </div>
               
-              {/* Menú desplegable */}
+              {/* Menú desplegable del usuario */}
               <div className="relative group">
-                <button className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-foreground">
-                  <span>▼</span>
+                <button 
+                  className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-foreground"
+                  aria-label="Opciones de usuario"
+                >
+                  <Icon name="ChevronDown" size={14} />
                 </button>
                 
-                {/* Opciones del menú */}
+                {/* Opciones del menú de usuario */}
                 <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                  <div className="px-4 py-2 border-b border-border">
+                    <p className="text-sm font-medium text-foreground">{userName || getRoleLabel()}</p>
+                    <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+                  </div>
+                  
                   <button 
-                    onClick={() => console.log('Ir a perfil')}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted rounded-t-lg"
+                    onClick={() => navigate('/profile')}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center space-x-2"
                   >
-                    Perfil
+                    <Icon name="User" size={14} />
+                    <span>Mi Perfil</span>
                   </button>
+                  
                   <button 
-                    onClick={() => { 
-                      // Redirigir a la página de login
-                      window.location.href = '/login'; 
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted rounded-b-lg text-destructive"
+                    onClick={() => navigate('/settings')}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center space-x-2"
                   >
-                    Cerrar sesión
+                    <Icon name="Settings" size={14} />
+                    <span>Configuración</span>
+                  </button>
+                  
+                  <div className="border-t border-border" />
+                  
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center space-x-2 text-destructive"
+                  >
+                    <Icon name="LogOut" size={14} />
+                    <span>Cerrar Sesión</span>
                   </button>
                 </div>
               </div>
@@ -441,6 +539,23 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
                 </div>
               )}
 
+              {/* Información del usuario en móvil */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center space-x-3 px-3 py-2 bg-muted rounded-lg">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                    <Icon name="User" size={16} className="text-primary-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {userName || getRoleLabel()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {userEmail || getRoleLabel()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Mobile Status Indicator */}
               <div className="pt-4 border-t border-border">
                 <div className="flex items-center justify-between px-3 py-2 bg-muted rounded-lg">
@@ -449,7 +564,7 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
                       connectionStatus === 'connected' ? 'bg-success' : 'bg-error'
                     }`} />
                     <span className="text-sm font-caption text-muted-foreground">
-                      {connectionStatus === 'connected' ? 'Online' : 'Offline'}
+                      {connectionStatus === 'connected' ? 'Conectado' : 'Desconectado'}
                     </span>
                   </div>
                   
@@ -463,6 +578,17 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
                   )}
                 </div>
               </div>
+
+              {/* Botón de cerrar sesión en móvil */}
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                fullWidth
+                className="justify-start text-destructive border-destructive/20"
+              >
+                <Icon name="LogOut" size={16} className="mr-2" />
+                Cerrar Sesión
+              </Button>
             </nav>
           </div>
         )}
@@ -479,8 +605,8 @@ const Header = ({ userRole = 'student', onEmergencyRequest, onRoleSwitch, access
         className="fixed bottom-20 right-4 z-200 shadow-lg hover:shadow-xl transition-shadow min-h-44 px-6"
         aria-label="Emergency assistance - Get immediate help"
       >
-        <span className="hidden sm:inline">Emergency Help</span>
-        <span className="sm:hidden">Help</span>
+        <span className="hidden sm:inline">Ayuda de Emergencia</span>
+        <span className="sm:hidden">Emergencia</span>
       </Button>
     </>
   );

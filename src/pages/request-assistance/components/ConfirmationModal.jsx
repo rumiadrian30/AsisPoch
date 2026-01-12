@@ -7,7 +7,9 @@ const ConfirmationModal = ({
   onClose, 
   requestData, 
   correlationId,
-  estimatedResponseTime 
+  estimatedResponseTime,
+  processingResult,
+  chainProgress = []
 }) => {
   if (!isOpen) return null;
 
@@ -34,11 +36,23 @@ const ConfirmationModal = ({
   const urgencyInfo = getUrgencyInfo(requestData?.urgency);
   const typeInfo = getAssistanceTypeInfo(requestData?.assistanceType);
 
+  // Función para obtener icono según el handler
+  const getHandlerIcon = (handlerName) => {
+    const iconMap = {
+      'EmergencyHandler': 'AlertTriangle',
+      'MobilityHandler': 'Accessibility',
+      'AcademicHandler': 'BookOpen',
+      'WellbeingHandler': 'Heart',
+      'NotificationHandler': 'Bell'
+    };
+    return iconMap[handlerName] || 'CheckCircle';
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-surface rounded-lg shadow-xl animate-slide-up">
+      <div className="w-full max-w-2xl bg-surface rounded-lg shadow-xl animate-slide-up max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="sticky top-0 z-10 flex items-center justify-between p-6 border-b border-border bg-surface">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-success rounded-full flex items-center justify-center">
               <Icon name="CheckCircle" size={24} className="text-white" />
@@ -48,7 +62,7 @@ const ConfirmationModal = ({
                 Solicitud Enviada Exitosamente
               </h2>
               <p className="text-sm text-muted-foreground">
-                Tu solicitud ha sido registrada y procesada
+                Tu solicitud ha sido procesada con Chain of Responsibility
               </p>
             </div>
           </div>
@@ -91,6 +105,127 @@ const ConfirmationModal = ({
               </div>
             </div>
           </div>
+
+          {/* Chain of Responsibility Section */}
+          {processingResult && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Icon name="GitBranch" size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-800">Procesado con Chain of Responsibility</h3>
+                  <p className="text-xs text-blue-700">
+                    Tu solicitud fue procesada por {processingResult.processedBy?.length || 0} handlers especializados
+                  </p>
+                </div>
+              </div>
+              
+              {/* Handlers Timeline */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium text-blue-800">Flujo de Procesamiento</h4>
+                  <span className="text-xs text-blue-600">
+                    {processingResult.metadata?.duration 
+                      ? `${processingResult.metadata.duration}ms` 
+                      : 'Procesado'}
+                  </span>
+                </div>
+                
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-blue-200"></div>
+                  
+                  <div className="space-y-3">
+                    {processingResult.processedBy?.map((handler, index) => {
+                      const handlerName = handler.handler.replace('Handler', '');
+                      const handlerIcon = getHandlerIcon(handler.handler);
+                      const isLast = index === processingResult.processedBy.length - 1;
+                      
+                      return (
+                        <div key={index} className="relative flex items-center space-x-3">
+                          {/* Timeline dot */}
+                          <div className={`
+                            z-10 w-8 h-8 rounded-full flex items-center justify-center
+                            ${isLast ? 'bg-green-100 border-2 border-green-300' : 'bg-blue-100 border-2 border-blue-300'}
+                          `}>
+                            <Icon 
+                              name={handlerIcon} 
+                              size={14} 
+                              className={isLast ? 'text-green-600' : 'text-blue-600'} 
+                            />
+                          </div>
+                          
+                          {/* Handler info */}
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-foreground">
+                                {handlerName}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(handler.timestamp).toLocaleTimeString([], { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit',
+                                  second: '2-digit' 
+                                })}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {index === 0 && 'Handler de emergencia - máxima prioridad'}
+                              {index === 1 && 'Handler de movilidad - accesibilidad'}
+                              {index === 2 && 'Handler académico - apoyo educativo'}
+                              {index === 3 && 'Handler de bienestar - salud mental'}
+                              {index === 4 && 'Handler de notificaciones - comunicación'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Chain Statistics */}
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="text-center p-2 bg-white rounded border">
+                  <div className="font-semibold text-blue-700">
+                    {processingResult.processedBy?.length || 0}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Handlers</div>
+                </div>
+                <div className="text-center p-2 bg-white rounded border">
+                  <div className="font-semibold text-green-700">
+                    {processingResult.status === 'completed' ? '✅' : '🔄'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Estado</div>
+                </div>
+                <div className="text-center p-2 bg-white rounded border">
+                  <div className="font-semibold text-purple-700">
+                    {processingResult.errors?.length || 0}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Errores</div>
+                </div>
+              </div>
+
+              {/* Errors if any */}
+              {processingResult.errors?.length > 0 && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Icon name="AlertCircle" size={16} className="text-red-600" />
+                    <span className="text-sm font-medium text-red-800">Errores durante el procesamiento</span>
+                  </div>
+                  <div className="text-xs text-red-600 space-y-1">
+                    {processingResult.errors.map((err, idx) => (
+                      <div key={idx} className="flex items-start space-x-2">
+                        <span className="mt-0.5">•</span>
+                        <span>{err.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Request Summary */}
           <div className="space-y-4">
@@ -163,6 +298,31 @@ const ConfirmationModal = ({
             </div>
           </div>
 
+          {/* Chain Progress Log (if available) */}
+          {chainProgress.length > 0 && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <Icon name="ListChecks" size={18} className="text-gray-600" />
+                <h4 className="font-medium text-sm text-foreground">Registro de Procesamiento</h4>
+              </div>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {chainProgress.map((item, index) => (
+                  <div 
+                    key={index} 
+                    className={`text-xs flex items-center space-x-2 ${
+                      item.includes('✅') ? 'text-green-700' : 
+                      item.includes('❌') ? 'text-red-700' : 
+                      'text-gray-700'
+                    }`}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-current flex-shrink-0"></div>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Next Steps */}
           <div className="space-y-3">
             <h4 className="font-medium text-foreground">Próximos Pasos</h4>
@@ -174,7 +334,7 @@ const ConfirmationModal = ({
                 'El personal llegará a tu ubicación según la prioridad establecida'
               ]?.map((step, index) => (
                 <div key={index} className="flex items-start space-x-2">
-                  <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center mt-0.5">
+                  <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center mt-0.5 flex-shrink-0">
                     <span className="text-xs font-medium text-primary-foreground">
                       {index + 1}
                     </span>
@@ -184,6 +344,34 @@ const ConfirmationModal = ({
               ))}
             </div>
           </div>
+
+          {/* Enhanced Features with Chain of Responsibility */}
+          {processingResult && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <Icon name="Zap" size={18} className="text-green-600" />
+                <h4 className="font-medium text-sm text-green-800">Ventajas del Chain of Responsibility</h4>
+              </div>
+              <ul className="text-xs text-green-700 space-y-1">
+                <li className="flex items-start space-x-2">
+                  <Icon name="CheckCircle" size={12} className="mt-0.5 text-green-500" />
+                  <span>Procesamiento especializado por handlers dedicados</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <Icon name="CheckCircle" size={12} className="mt-0.5 text-green-500" />
+                  <span>Trazabilidad completa del flujo de procesamiento</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <Icon name="CheckCircle" size={12} className="mt-0.5 text-green-500" />
+                  <span>Manejo de errores granular y específico</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <Icon name="CheckCircle" size={12} className="mt-0.5 text-green-500" />
+                  <span>Escalabilidad fácil para nuevos tipos de asistencia</span>
+                </li>
+              </ul>
+            </div>
+          )}
 
           {/* Emergency Contact */}
           {requestData?.urgency === 'critical' && (
@@ -205,15 +393,29 @@ const ConfirmationModal = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-border bg-muted/30">
+        <div className="sticky bottom-0 flex items-center justify-between p-6 border-t border-border bg-surface">
           <div className="text-sm text-muted-foreground">
-            Solicitud creada el {new Date()?.toLocaleDateString('es-ES', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+            {processingResult ? (
+              <span>
+                Procesado con Chain of Responsibility • {new Date().toLocaleDateString('es-ES', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </span>
+            ) : (
+              <span>
+                Solicitud creada el {new Date().toLocaleDateString('es-ES', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </span>
+            )}
           </div>
           
           <Button

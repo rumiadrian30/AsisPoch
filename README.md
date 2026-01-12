@@ -33,32 +33,63 @@ Sistema de asistencia y accesibilidad para la comunidad ESPOCH, diseñado para a
    npm install --save-dev @types/babel__traverse
    
 2. Start the development server:
-   ```bash
-   npm start
-   # or
-   yarn start
+   ```tanto en backend como en la ruta principal ejecutar
+   npm run start
+
    ```
 
 ## 📁 Project Structure
 
 ```
 react_app/
+├── backend/
+│   ├── package-lock.json
+│   ├── package.json
+│   └── server.js
 ├── public/             # Static assets
 ├── src/
 │   ├── components/     # Reusable UI components
-│       ├──ui
-│   ├── pages/          # Page components
+│   │   ├──ui
+│   │   │   └──Button.jsx
+│   │   │   └──CheckBox.jsx
+│   │   │   └──Header.jsx
+│   │   │   └──Input.jsx
+│   │   │   └──Modal.jsx
+│   │   │   └──Select.jsx
+│   │   └──AppIcon.jsx
+│   │   └──AppImage.jsx
+│   │   └──DebugPanel.jsx
+│   │   └──ErrorBoundary.jsx
+│   │   └──ScrollTop.jsx
+│   ├── hooks/ 
+│   │   └──useAssistanceRequestForm.js
+│   ├── services/ 
+│   │   └──AssistanceRequestService.js
+│   │   └──apiService.js
+│   └─── pages/          # Page components
 │       ├──incident-reporting
+│       │   └──Components
+│       │   └──index.jsx
 │       ├──campus-incident-monitor
+│       │   └──Components
+│       │   └──index.jsx
 │       ├──login
+│       │   └──Components
+│       │   └──index.jsx
 │       ├──request-assistance
+│       │   └──Components
+│       │   └──index.jsx
 │       ├──route-navigation
+│       │   └──Components
+│       │   └──index.jsx
 │       ├──student-dashboard
-│   ├── styles/         # Global styles and Tailwind configuration
-│   ├── utils/         # Global styles and Tailwind configuration
-│   ├── App.jsx         # Main application component
-│   ├── Routes.jsx      # Application routes
-│   └── index.jsx       # Application entry point
+│           └──Components
+│           └──index.jsx
+├── ├── styles/         # Global styles and Tailwind configuration
+├── ├── utils/         # Global styles and Tailwind configuration
+├── ├── App.jsx         # Main application component
+├── ├── Routes.jsx      # Application routes
+├── └── index.jsx       # Application entry point
 ├── .env                # Environment variables
 ├── index.html          # HTML template
 ├── package.json        # Project dependencies and scripts
@@ -67,7 +98,31 @@ react_app/
 └── favicon.ico
 └── jsconfig.json
 └── vite.config.mjs
-
+```
+## Implementación del Patrón Chain of Responsibility
+## Estructura de Clases Base
+src/
+├── patterns/
+│   ├── chain-of-responsibility/
+│   │   ├── handlers/
+│   │   │   ├── BaseHandler.js
+│   │   │   ├── EmergencyHandler.js
+│   │   │   ├── MobilityHandler.js
+│   │   │   ├── AcademicHandler.js
+│   │   │   └── WellbeingHandler.js
+│   │   ├── RequestContext.js
+│   │   └── AssistanceChain.js
+│   ├── incident-chain/
+│   │   ├── handlers/
+│   │   │   ├── AccessibilityIncidentHandler.js
+│   │   │   ├── DocumentationHandler.js
+│   │   │   ├── EmergencyIncidentHandler.js
+│   │   │   ├── InfrastructureIncidentHandler.js
+│   │   │   └── NotificationHandler.js
+│   │   ├── BaseHandler.js
+│   │   ├── IncidentChain.js
+│   │   └── IncidentContext.js
+```
 ```
 ## 🧩 Adding Routes
 

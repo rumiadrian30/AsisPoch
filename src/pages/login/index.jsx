@@ -110,7 +110,7 @@ const LoginPage = () => {
                   Sistema de Asistencia de Movilidad
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Acceso seguro para estudiantes, personal y administradores
+                  Acceso seguro para estudiantes, voluntarios y administradores
                 </p>
               </div>
 

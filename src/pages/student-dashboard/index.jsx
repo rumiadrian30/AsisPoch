@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../../components/ui/Header';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -12,6 +12,7 @@ import AlertBanner from './components/AlertBanner';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentUser] = useState({
     id: 1,
     name: "Rumi Adrian Grefa Rivadeneyra",
@@ -24,6 +25,8 @@ const StudentDashboard = () => {
   const [activeRequests, setActiveRequests] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('connected');
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [chainProcessingResult, setChainProcessingResult] = useState(null);
+  const [showChainSuccess, setShowChainSuccess] = useState(false);
 
   // Mock active assistance requests
   const mockRequests = [
@@ -59,6 +62,35 @@ const StudentDashboard = () => {
       eta: null
     }
   ];
+
+  // Check for Chain of Responsibility results from incident reporting
+  useEffect(() => {
+    if (location?.state?.processedByChain) {
+      setChainProcessingResult({
+        reportSubmitted: location.state.reportSubmitted,
+        trackingNumber: location.state.trackingNumber,
+        severity: location.state.severity,
+        estimatedResolution: location.state.estimatedResolution,
+        chainHandlers: location.state.chainHandlers || [],
+        chainDuration: location.state.chainDuration || 0,
+        timestamp: new Date()
+      });
+      setShowChainSuccess(true);
+      
+      // Clear the state after showing
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
+
+  // Auto-hide Chain of Responsibility success message after 10 seconds
+  useEffect(() => {
+    if (showChainSuccess) {
+      const timer = setTimeout(() => {
+        setShowChainSuccess(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [showChainSuccess]);
 
   // WebSocket simulation for real-time updates
   useEffect(() => {
@@ -149,7 +181,8 @@ const StudentDashboard = () => {
       iconColor: "text-warning",
       bgColor: "bg-warning/5",
       borderColor: "border-warning/20",
-      onClick: () => navigate('/incident-reporting')
+      onClick: () => navigate('/incident-reporting'),
+      chainBadge: true // Indica que usa Chain of Responsibility
     },
     {
       title: "Servicios de Bienestar",
@@ -211,6 +244,78 @@ const StudentDashboard = () => {
           </div>
         </div>
 
+        {/* Chain of Responsibility Success Banner */}
+        {showChainSuccess && chainProcessingResult && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-fade-in">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Icon name="GitBranch" size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-800 mb-1">
+                    ✅ Reporte procesado con Chain of Responsibility
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-2">
+                    Tu reporte fue procesado automáticamente por nuestra cadena de responsabilidad.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    <div className="bg-white p-2 rounded border">
+                      <div className="font-medium text-blue-700">
+                        {chainProcessingResult.trackingNumber}
+                      </div>
+                      <div className="text-xs text-blue-600">N° de seguimiento</div>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border">
+                      <div className="font-medium text-blue-700">
+                        {chainProcessingResult.chainHandlers.length}
+                      </div>
+                      <div className="text-xs text-blue-600">Handlers ejecutados</div>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border">
+                      <div className="font-medium text-blue-700">
+                        {chainProcessingResult.chainDuration}ms
+                      </div>
+                      <div className="text-xs text-blue-600">Tiempo de procesamiento</div>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border">
+                      <div className="font-medium text-blue-700">
+                        {chainProcessingResult.estimatedResolution}
+                      </div>
+                      <div className="text-xs text-blue-600">Resolución estimada</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {chainProcessingResult.chainHandlers.map((handler, idx) => (
+                      <span 
+                        key={idx} 
+                        className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center space-x-1"
+                      >
+                        <Icon name="CheckCircle" size={10} />
+                        <span>{handler}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowChainSuccess(false)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                <Icon name="X" size={16} />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Alert Banners */}
         <AlertBanner
           alerts={[]}
@@ -252,9 +357,15 @@ const StudentDashboard = () => {
 
         {/* Quick Actions Grid */}
         <section>
-          <h2 className="text-xl font-semibold text-foreground mb-4">
-            Acciones Rápidas
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-foreground">
+              Acciones Rápidas
+            </h2>
+            <span className="text-sm text-muted-foreground flex items-center space-x-1">
+              <Icon name="GitBranch" size={14} className="text-primary" />
+              <span>🏗️ = Chain of Responsibility</span>
+            </span>
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {quickActions?.map((action, index) => (
               <QuickActionCard
@@ -291,6 +402,54 @@ const StudentDashboard = () => {
               onMarkAllAsRead={() => {}}
             />
 
+            {/* Chain of Responsibility Stats */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Icon name="GitBranch" size={16} className="text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-blue-800">Chain of Responsibility</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Icon name="GitMerge" size={14} className="text-blue-600" />
+                    <span className="text-sm text-blue-700">Handlers disponibles</span>
+                  </div>
+                  <span className="font-medium text-blue-800">5</span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Icon name="Zap" size={14} className="text-green-600" />
+                    <span className="text-sm text-blue-700">Reportes procesados</span>
+                  </div>
+                  <span className="font-medium text-blue-800">24</span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Icon name="Clock" size={14} className="text-purple-600" />
+                    <span className="text-sm text-blue-700">Tiempo promedio</span>
+                  </div>
+                  <span className="font-medium text-blue-800">320ms</span>
+                </div>
+                
+                <div className="pt-2 border-t border-blue-200">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/incident-reporting')}
+                    iconName="AlertTriangle"
+                    iconPosition="left"
+                    className="w-full text-blue-700 border-blue-300 hover:bg-blue-100"
+                  >
+                    Probar Chain of Responsibility
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Quick Stats */}
             <div className="bg-card border border-border rounded-lg p-4">
               <h3 className="font-semibold text-foreground mb-4">Estadísticas</h3>
@@ -318,6 +477,50 @@ const StudentDashboard = () => {
                   </div>
                   <span className="font-medium text-foreground">25</span>
                 </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Icon name="AlertTriangle" size={16} className="text-error" />
+                    <span className="text-sm text-muted-foreground">Incidentes reportados</span>
+                  </div>
+                  <span className="font-medium text-foreground">7</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chain of Responsibility Explanation */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-start space-x-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Icon name="GitBranch" size={24} className="text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                ¿Qué es Chain of Responsibility?
+              </h3>
+              <p className="text-blue-700 mb-3">
+                Es un patrón de diseño que procesa automáticamente tus reportes de incidentes 
+                a través de una cadena de handlers especializados. Cada handler analiza el 
+                incidente y toma acciones específicas según su tipo.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                {[
+                  { icon: 'AlertTriangle', label: 'Emergencia', desc: 'Criticidad máxima' },
+                  { icon: 'Accessibility', label: 'Accesibilidad', desc: 'Impacto en movilidad' },
+                  { icon: 'Wrench', label: 'Infraestructura', desc: 'Daños estructurales' },
+                  { icon: 'FileText', label: 'Documentación', desc: 'Registro completo' },
+                  { icon: 'Bell', label: 'Notificaciones', desc: 'Alertas automáticas' }
+                ].map((item, idx) => (
+                  <div key={idx} className="bg-white/70 p-3 rounded border border-blue-200">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <Icon name={item.icon} size={14} className="text-blue-600" />
+                      <span className="text-sm font-medium text-blue-800">{item.label}</span>
+                    </div>
+                    <p className="text-xs text-blue-600">{item.desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
